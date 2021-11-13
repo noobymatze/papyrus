@@ -26,6 +26,11 @@ compileHelp env expr =
             , env
             )
 
+        Syntax.Str string ->
+            ( Just <| text string
+            , env
+            )
+
         Syntax.Float float ->
             ( Just <| text (String.fromFloat float)
             , env

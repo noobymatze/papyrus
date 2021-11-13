@@ -14,6 +14,7 @@ type Expr
     = Int Int
     | Float Float
     | Symbol String
+    | Str String
     | List (List Expr)
     | Fn { args : List String, body : Expr }
     | Prog (List Expr)
@@ -31,6 +32,9 @@ encode expr =
 
         Float float ->
             Encode.float float
+
+        Str string ->
+            Encode.string string
 
         Symbol string ->
             Encode.string string
@@ -73,7 +77,8 @@ prog =
 form : Parser Expr
 form =
     Parser.oneOf
-        [ symbol
+        [ str
+        , symbol
         , number
         , Parser.map List list
         ]
@@ -129,3 +134,18 @@ whitespace =
 isWhitespace : Char -> Bool
 isWhitespace c =
     c == ' ' || c == '\n' || c == '\t'
+
+
+str : Parser Expr
+str =
+    Parser.succeed Str
+        |. Parser.token "\""
+        |= strHelp
+        |. Parser.token "\""
+
+
+strHelp : Parser String
+strHelp =
+    Parser.getChompedString <|
+        Parser.succeed ()
+            |. Parser.chompWhile (\c -> c /= '"')
