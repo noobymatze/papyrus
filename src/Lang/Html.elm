@@ -3,12 +3,8 @@ module Lang.Html exposing (..)
 import Dict exposing (Dict)
 import Html exposing (Html, div, input, node, text)
 import Html.Attributes exposing (class, type_)
+import Lang.Env as Env exposing (Env)
 import Lang.Syntax as Syntax exposing (Expr)
-
-
-type alias Env =
-    { bindings : Dict String Expr
-    }
 
 
 
@@ -18,7 +14,7 @@ type alias Env =
 compile : Syntax.Expr -> Maybe (Html msg)
 compile expr =
     expr
-        |> compileHelp (Env Dict.empty)
+        |> compileHelp Env.default
         |> Tuple.first
 
 
@@ -36,7 +32,7 @@ compileHelp env expr =
             )
 
         Syntax.Symbol str ->
-            case Dict.get str env.bindings of
+            case Env.get str env of
                 Nothing ->
                     ( Just <| text <| "Unknown symbol " ++ str
                     , env
@@ -47,7 +43,12 @@ compileHelp env expr =
 
         Syntax.List ((Syntax.Symbol "def") :: (Syntax.Symbol name) :: subExpr :: []) ->
             ( Nothing
-            , { env | bindings = Dict.insert name subExpr env.bindings }
+            , Env.set name subExpr env
+            )
+
+        Syntax.List ((Syntax.Symbol "defn") :: (Syntax.Symbol name) :: (Syntax.List args) :: body :: []) ->
+            ( Nothing
+            , Env.set name (Syntax.Fn { args = List.filterMap symbol args, body = body }) env
             )
 
         Syntax.List ((Syntax.Symbol "row") :: children) ->
@@ -65,8 +66,8 @@ compileHelp env expr =
             , env
             )
 
-        Syntax.List ((Syntax.Symbol nodeName) :: children) ->
-            ( Just <| node nodeName [] (List.filterMap (compileHelp env >> Tuple.first) children)
+        Syntax.List ((Syntax.Symbol fn) :: children) ->
+            ( apply env fn children
             , env
             )
 
@@ -74,6 +75,9 @@ compileHelp env expr =
             ( Just <| text (Debug.toString rest)
             , env
             )
+
+        Syntax.Fn { args, body } ->
+            ( Nothing, env )
 
         Syntax.Prog exprs ->
             let
@@ -90,3 +94,33 @@ compileHelp env expr =
             ( Just <| div [] (List.filterMap identity elements)
             , newEnv
             )
+
+
+symbol : Expr -> Maybe String
+symbol expr =
+    case expr of
+        Syntax.Symbol name ->
+            Just name
+
+        _ ->
+            Nothing
+
+
+apply : Env -> String -> List Expr -> Maybe (Html msg)
+apply env name params =
+    case Env.get name env of
+        Nothing ->
+            Just <| node name [] (List.filterMap (compileHelp env >> Tuple.first) params)
+
+        Just (Syntax.Fn { args, body }) ->
+            let
+                fnEnv =
+                    params
+                        |> List.map2 Tuple.pair args
+                        |> Dict.fromList
+                        |> Env.withParent env
+            in
+            Tuple.first (compileHelp fnEnv body)
+
+        Just expr ->
+            Tuple.first (compileHelp env expr)

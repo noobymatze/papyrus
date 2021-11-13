@@ -1,5 +1,6 @@
 module Lang.Syntax exposing (..)
 
+import Html exposing (Html)
 import Json.Encode as Encode exposing (Value)
 import Parser exposing ((|.), (|=), DeadEnd, Parser)
 import Set
@@ -14,6 +15,7 @@ type Expr
     | Float Float
     | Symbol String
     | List (List Expr)
+    | Fn { args : List String, body : Expr }
     | Prog (List Expr)
 
 
@@ -38,6 +40,12 @@ encode expr =
 
         Prog exprs ->
             Encode.list encode exprs
+
+        Fn record ->
+            Encode.object
+                [ ( "args", Encode.list Encode.string record.args )
+                , ( "body", encode record.body )
+                ]
 
 
 
