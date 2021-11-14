@@ -3,13 +3,14 @@ module Lang.Eval exposing (..)
 import Dict exposing (Dict)
 import Element exposing (Element(..), attribute, node)
 import Lang.Env as Env exposing (Env)
-import Lang.Syntax exposing (Expr(..))
+import Lang.Syntax as Syntax exposing (Expr(..))
 
 
 type Error
     = UnknownSymbol String
     | TypeMismatch { required : String, found : String }
     | Uncallable Expr
+    | ArithmeticError String
 
 
 
@@ -30,6 +31,9 @@ evalHelp env expr =
             Ok ( expr, env )
 
         Float _ ->
+            Ok ( expr, env )
+
+        Boolean _ ->
             Ok ( expr, env )
 
         Nil ->
@@ -63,6 +67,9 @@ evalHelp env expr =
 
         List ((Symbol "defn") :: (Symbol name) :: (List args) :: body :: rest) ->
             evalDefn env name args body rest
+
+        List ((Symbol "if") :: condition :: then_ :: else_ :: _) ->
+            evalIf env condition then_ else_
 
         List (proc :: params) ->
             case evalSequence env params of
@@ -108,38 +115,41 @@ applyFn env expr params =
             Err (Uncallable expr)
 
 
-builtin : Dict String (Env -> List Expr -> Result Error ( Expr, Env ))
+builtin : Dict String (List Expr -> Result Error Expr)
 builtin =
     Dict.empty
+        |> Dict.insert "+" (op add (Ok (Int 0)))
+        |> Dict.insert "*" (op mult (Ok (Int 1)))
+        -- |> Dict.insert "/" (op mult (Err (ArithmeticError "Cannot divide nothing")))
+        -- |> Dict.insert "-" (op mult (Err (ArithmeticError "Cannot subtract from nothing")))
         |> Dict.insert "str"
-            (\env args ->
+            (\args ->
                 Ok
-                    ( args
-                        |> List.map str
+                    (args
+                        |> List.map toString
                         |> String.join ""
                         |> Str
-                    , env
                     )
             )
         |> Dict.insert "row"
-            (\env args ->
-                Ok ( Html (node "div" [ attribute "class" "row" ] (List.filterMap toElement args)), env )
+            (\args ->
+                Ok (Html (node "div" [ attribute "class" "row" ] (List.filterMap toElement args)))
             )
         |> Dict.insert "col"
-            (\env args ->
-                Ok ( Html (node "div" [ attribute "class" "col-sm" ] (List.filterMap toElement args)), env )
+            (\args ->
+                Ok (Html (node "div" [ attribute "class" "col-sm" ] (List.filterMap toElement args)))
             )
         |> Dict.insert "input"
-            (\env _ ->
-                Ok ( Html (node "input" [ attribute "class" "form-control", attribute "type" "text" ] []), env )
+            (\_ ->
+                Ok (Html (node "input" [ attribute "class" "form-control", attribute "type" "text" ] []))
             )
         |> Dict.insert "label"
-            (\env args ->
-                Ok ( Html (node "label" [] (List.filterMap toElement args)), env )
+            (\args ->
+                Ok (Html (node "label" [] (List.filterMap toElement args)))
             )
         |> Dict.insert "text"
-            (\env args ->
-                Ok ( Html (Element.str (String.join "" <| List.map str args)), env )
+            (\args ->
+                Ok (Html (Element.str (String.join "" <| List.map toString args)))
             )
 
 
@@ -152,7 +162,8 @@ applyBuiltin env expr args =
                     Err (Uncallable expr)
 
                 Just f ->
-                    f env args
+                    f args
+                        |> Result.map (\result -> ( result, env ))
 
         _ ->
             Err (Uncallable expr)
@@ -166,6 +177,22 @@ isBuiltin expr =
 
         _ ->
             False
+
+
+evalIf : Env -> Expr -> Expr -> Expr -> Result Error ( Expr, Env )
+evalIf env condition then_ else_ =
+    case evalHelp env condition of
+        Ok ( Boolean True, _ ) ->
+            evalHelp env then_
+
+        Ok ( Boolean False, _ ) ->
+            evalHelp env else_
+
+        Err error ->
+            Err error
+
+        Ok ( result, _ ) ->
+            Err (TypeMismatch { required = "Bool", found = Syntax.type_ result })
 
 
 evalSymbol : Env -> String -> Result Error ( Expr, Env )
@@ -209,23 +236,52 @@ evalDefn env name args body rest =
         )
 
 
+op : (Expr -> Expr -> Result Error Expr) -> Result Error Expr -> List Expr -> Result Error Expr
+op combine zero =
+    let
+        step next result =
+            case result of
+                Ok expr ->
+                    combine expr next
+
+                Err error ->
+                    Err error
+    in
+    List.foldl step zero
+
+
 add : Expr -> Expr -> Result Error Expr
-add expr1 expr2 =
+add =
+    numOp (+) (+)
+
+
+mult : Expr -> Expr -> Result Error Expr
+mult =
+    numOp (*) (*)
+
+
+numOp : (Int -> Int -> Int) -> (Float -> Float -> Float) -> Expr -> Expr -> Result Error Expr
+numOp forInt forFloat expr1 expr2 =
     case ( expr1, expr2 ) of
         ( Int a, Int b ) ->
-            Ok (Int (a + b))
+            Ok (Int (forInt a b))
 
         ( Int a, Float b ) ->
-            Ok (Float (toFloat a + b))
+            Ok (Float (forFloat (toFloat a) b))
 
         ( Float _, Int _ ) ->
-            add expr2 expr1
+            numOp forInt forFloat expr2 expr1
 
         ( Float a, Float b ) ->
-            Ok (Float (a + b))
+            Ok (Float (forFloat a b))
 
         ( _, _ ) ->
-            Err (TypeMismatch { required = "Int or Float", found = "Something else" })
+            Err
+                (TypeMismatch
+                    { required = "Int or Float"
+                    , found = Syntax.type_ expr1 ++ " and " ++ Syntax.type_ expr2
+                    }
+                )
 
 
 toElement : Expr -> Maybe Element
@@ -247,8 +303,8 @@ toElement expr =
             Nothing
 
 
-str : Expr -> String
-str expr =
+toString : Expr -> String
+toString expr =
     case expr of
         Int int ->
             String.fromInt int
@@ -262,6 +318,12 @@ str expr =
         Str string ->
             string
 
+        Boolean True ->
+            "true"
+
+        Boolean False ->
+            "false"
+
         Html html ->
             "Html"
 
@@ -269,13 +331,13 @@ str expr =
             ""
 
         List expressions ->
-            "(" ++ String.join " " (List.map str expressions) ++ ")"
+            "(" ++ String.join " " (List.map toString expressions) ++ ")"
 
         Fn _ ->
             "Fn"
 
         Prog expressions ->
-            String.join " " (List.map str expressions)
+            String.join " " (List.map toString expressions)
 
 
 

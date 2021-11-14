@@ -15,6 +15,7 @@ type Expr
     | Float Float
     | Symbol String
     | Str String
+    | Boolean Bool
     | Nil
     | Html Element
     | List (List Expr)
@@ -38,6 +39,9 @@ encode expr =
         Str string ->
             Encode.string string
 
+        Boolean bool ->
+            Encode.bool bool
+
         Nil ->
             Encode.null
 
@@ -58,6 +62,40 @@ encode expr =
                 [ ( "args", Encode.list Encode.string record.args )
                 , ( "body", encode record.body )
                 ]
+
+
+type_ : Expr -> String
+type_ expr =
+    case expr of
+        Int _ ->
+            "Int"
+
+        Float _ ->
+            "Float"
+
+        Symbol _ ->
+            "Symbol"
+
+        Str _ ->
+            "String"
+
+        Boolean _ ->
+            "Bool"
+
+        Nil ->
+            "Nil"
+
+        Html _ ->
+            "Html"
+
+        List _ ->
+            "List"
+
+        Fn _ ->
+            "Fn"
+
+        Prog _ ->
+            "Program"
 
 
 
@@ -86,6 +124,7 @@ form : Parser Expr
 form =
     Parser.oneOf
         [ str
+        , boolean
         , symbol
         , number
         , Parser.map List list
@@ -113,6 +152,14 @@ number =
         , hex = Nothing
         , octal = Nothing
         }
+
+
+boolean : Parser Expr
+boolean =
+    Parser.oneOf
+        [ Parser.token "true" |> Parser.map (always (Boolean True))
+        , Parser.token "false" |> Parser.map (always (Boolean False))
+        ]
 
 
 symbol : Parser Expr

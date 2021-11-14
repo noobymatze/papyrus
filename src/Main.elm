@@ -86,32 +86,11 @@ viewResult result =
         Err (Uncallable expr) ->
             text <| "The expression " ++ Encode.encode 2 (Syntax.encode expr) ++ " is uncallable or unknown"
 
+        Err (ArithmeticError message) ->
+            text message
+
         Ok expr ->
-            let
-                elements =
-                    findElements expr
-            in
-            if List.isEmpty elements then
-                text <| Encode.encode 2 (Syntax.encode expr)
-
-            else
-                div [] (List.map Element.toHtml elements)
-
-
-findElements : Expr -> List Element
-findElements expr =
-    case expr of
-        List subExpressions ->
-            List.concatMap findElements subExpressions
-
-        Prog subExpressions ->
-            List.concatMap findElements subExpressions
-
-        Html element ->
-            [ element ]
-
-        _ ->
-            []
+            viewExpr expr
 
 
 hidden : Html msg
@@ -119,17 +98,41 @@ hidden =
     span [ style "display" "none" ] []
 
 
-viewExpr : Maybe Expr -> Html Msg
-viewExpr maybeExpr =
-    case maybeExpr of
-        Nothing ->
-            text ""
+viewExpr : Expr -> Html Msg
+viewExpr expr =
+    case expr of
+        Int int ->
+            text (String.fromInt int)
 
-        Just expr ->
-            expr
-                |> Syntax.encode
-                |> Encode.encode 2
-                |> text
+        Float float ->
+            text (String.fromFloat float)
+
+        Symbol string ->
+            text string
+
+        Str string ->
+            text string
+
+        Boolean True ->
+            text "true"
+
+        Boolean False ->
+            text "false"
+
+        Nil ->
+            text "nil"
+
+        Html element ->
+            Element.toHtml element
+
+        List exprs ->
+            div [] (List.map viewExpr exprs)
+
+        Fn _ ->
+            text <| Encode.encode 2 <| Syntax.encode expr
+
+        Prog exprs ->
+            div [] (List.map viewExpr exprs)
 
 
 codeEditor : (String -> msg) -> String -> Html msg
