@@ -2,7 +2,6 @@
   "name": "papyrus",
   "version": "1.0.0",
   "description": "An application for building websites and forms visually",
-  "main": "dist/index.html",
   "scripts": {
     "dev": "parcel serve index.html",
     "build": "parcel build index.html",
