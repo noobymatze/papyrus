@@ -2,7 +2,7 @@ stages:
   - build
   - deploy
 
-image: node:14
+image: node:16
 
 build:
   stage: build
