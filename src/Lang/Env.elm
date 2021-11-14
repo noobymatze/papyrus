@@ -29,6 +29,11 @@ withParent parent bindings =
     Env { bindings = bindings, parent = Just parent }
 
 
+extend : Dict String Expr -> Env -> Env
+extend bindings parent =
+    Env { bindings = bindings, parent = Just parent }
+
+
 set : String -> Expr -> Env -> Env
 set name expr (Env env) =
     Env { env | bindings = Dict.insert name expr env.bindings }

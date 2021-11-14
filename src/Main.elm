@@ -6,6 +6,7 @@ import Html.Attributes exposing (class, style, value)
 import Html.Events exposing (onInput)
 import Json.Decode
 import Json.Encode as Encode
+import Lang.Eval as Eval exposing (Error(..))
 import Lang.Html as Html exposing (compile)
 import Lang.Syntax as Syntax exposing (Expr)
 import Ports
@@ -66,9 +67,27 @@ view model =
         [ class "container-fluid h-100" ]
         [ div [ class "row p-3 h-100" ]
             [ div [ class "col-sm h-100" ] [ codeEditor Update model.input ]
-            , div [ class "col-sm h-100" ] [ Maybe.withDefault hidden (Maybe.andThen Html.compile model.expr) ]
+            , div [ class "col-sm h-100" ]
+                [ Maybe.withDefault hidden <| Maybe.map viewResult <| Maybe.map Eval.eval model.expr
+                ]
             ]
         ]
+
+
+viewResult : Result Error Expr -> Html Msg
+viewResult result =
+    case result of
+        Err (UnknownSymbol name) ->
+            text <| "Unknown Symbol '" ++ name ++ "'"
+
+        Err (TypeMismatch { required, found }) ->
+            text <| "Type mismatch, required '" ++ required ++ "', found '" ++ found ++ "'"
+
+        Err (Uncallable expr) ->
+            text <| "The expression " ++ Encode.encode 2 (Syntax.encode expr) ++ " is uncallable or unknown"
+
+        Ok expr ->
+            text <| Encode.encode 2 (Syntax.encode expr)
 
 
 hidden : Html msg

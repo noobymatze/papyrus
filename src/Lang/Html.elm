@@ -26,6 +26,11 @@ compileHelp env expr =
             , env
             )
 
+        Syntax.Nil ->
+            ( Nothing
+            , env
+            )
+
         Syntax.Str string ->
             ( Just <| text string
             , env
