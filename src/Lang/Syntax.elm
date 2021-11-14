@@ -1,5 +1,6 @@
 module Lang.Syntax exposing (..)
 
+import Element exposing (Element)
 import Json.Encode as Encode exposing (Value)
 import Parser exposing ((|.), (|=), DeadEnd, Parser)
 import Set
@@ -15,6 +16,7 @@ type Expr
     | Symbol String
     | Str String
     | Nil
+    | Html Element
     | List (List Expr)
     | Fn { args : List String, body : Expr }
     | Prog (List Expr)
@@ -47,6 +49,9 @@ encode expr =
 
         Prog exprs ->
             Encode.list encode exprs
+
+        Html html ->
+            Element.encode html
 
         Fn record ->
             Encode.object

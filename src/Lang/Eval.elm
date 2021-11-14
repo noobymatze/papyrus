@@ -1,6 +1,7 @@
 module Lang.Eval exposing (..)
 
-import Dict
+import Dict exposing (Dict)
+import Element exposing (Element(..), attribute, node)
 import Lang.Env as Env exposing (Env)
 import Lang.Syntax exposing (Expr(..))
 
@@ -35,6 +36,9 @@ evalHelp env expr =
             Ok ( expr, env )
 
         Str _ ->
+            Ok ( expr, env )
+
+        Html _ ->
             Ok ( expr, env )
 
         Symbol symbol ->
@@ -104,17 +108,51 @@ applyFn env expr params =
             Err (Uncallable expr)
 
 
+builtin : Dict String (Env -> List Expr -> Result Error ( Expr, Env ))
+builtin =
+    Dict.empty
+        |> Dict.insert "str"
+            (\env args ->
+                Ok
+                    ( args
+                        |> List.map str
+                        |> String.join ""
+                        |> Str
+                    , env
+                    )
+            )
+        |> Dict.insert "row"
+            (\env args ->
+                Ok ( Html (node "div" [ attribute "class" "row" ] (List.filterMap toElement args)), env )
+            )
+        |> Dict.insert "col"
+            (\env args ->
+                Ok ( Html (node "div" [ attribute "class" "col-sm" ] (List.filterMap toElement args)), env )
+            )
+        |> Dict.insert "input"
+            (\env _ ->
+                Ok ( Html (node "input" [ attribute "class" "form-control", attribute "type" "text" ] []), env )
+            )
+        |> Dict.insert "label"
+            (\env args ->
+                Ok ( Html (node "label" [] (List.filterMap toElement args)), env )
+            )
+        |> Dict.insert "text"
+            (\env args ->
+                Ok ( Html (Element.str (String.join "" <| List.map str args)), env )
+            )
+
+
 applyBuiltin : Env -> Expr -> List Expr -> Result Error ( Expr, Env )
 applyBuiltin env expr args =
     case expr of
-        Symbol "str" ->
-            Ok
-                ( args
-                    |> List.map str
-                    |> String.join ""
-                    |> Str
-                , env
-                )
+        Symbol name ->
+            case Dict.get name builtin of
+                Nothing ->
+                    Err (Uncallable expr)
+
+                Just f ->
+                    f env args
 
         _ ->
             Err (Uncallable expr)
@@ -124,7 +162,7 @@ isBuiltin : Expr -> Bool
 isBuiltin expr =
     case expr of
         Symbol symbol ->
-            List.member symbol [ "+", "-", "*", "/", "str" ]
+            Dict.member symbol builtin
 
         _ ->
             False
@@ -190,6 +228,25 @@ add expr1 expr2 =
             Err (TypeMismatch { required = "Int or Float", found = "Something else" })
 
 
+toElement : Expr -> Maybe Element
+toElement expr =
+    case expr of
+        Html html ->
+            Just html
+
+        Str string ->
+            Just (Text string)
+
+        Int i ->
+            Just (Text (String.fromInt i))
+
+        Float i ->
+            Just (Text (String.fromFloat i))
+
+        _ ->
+            Nothing
+
+
 str : Expr -> String
 str expr =
     case expr of
@@ -204,6 +261,9 @@ str expr =
 
         Str string ->
             string
+
+        Html html ->
+            "Html"
 
         Nil ->
             ""

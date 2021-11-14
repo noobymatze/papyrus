@@ -1,14 +1,14 @@
 module Main exposing (main)
 
 import Browser
+import Element exposing (Element)
 import Html exposing (Html, div, h1, node, pre, span, text, textarea)
 import Html.Attributes exposing (class, style, value)
 import Html.Events exposing (onInput)
 import Json.Decode
 import Json.Encode as Encode
 import Lang.Eval as Eval exposing (Error(..))
-import Lang.Html as Html exposing (compile)
-import Lang.Syntax as Syntax exposing (Expr)
+import Lang.Syntax as Syntax exposing (Expr(..))
 import Ports
 
 
@@ -87,7 +87,31 @@ viewResult result =
             text <| "The expression " ++ Encode.encode 2 (Syntax.encode expr) ++ " is uncallable or unknown"
 
         Ok expr ->
-            text <| Encode.encode 2 (Syntax.encode expr)
+            let
+                elements =
+                    findElements expr
+            in
+            if List.isEmpty elements then
+                text <| Encode.encode 2 (Syntax.encode expr)
+
+            else
+                div [] (List.map Element.toHtml elements)
+
+
+findElements : Expr -> List Element
+findElements expr =
+    case expr of
+        List subExpressions ->
+            List.concatMap findElements subExpressions
+
+        Prog subExpressions ->
+            List.concatMap findElements subExpressions
+
+        Html element ->
+            [ element ]
+
+        _ ->
+            []
 
 
 hidden : Html msg
