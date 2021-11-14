@@ -19,7 +19,7 @@ build:
     paths:
       - src/.vuepress/dist
   only:
-    - master
+    - main
 
 deploy:
   stage: deploy
