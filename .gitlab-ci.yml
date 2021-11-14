@@ -26,6 +26,5 @@ deploy:
   dependencies:
     - build
   script:
-    - npm run build
     - cp -R dist/* /var/www/papyrus.noobymatze.io/
 
