@@ -1,11 +1,30 @@
 stages:
+  - build
   - deploy
+
+image: node:14
+
+build:
+  stage: build
+  tags:
+    - docker
+  cache:
+    paths:
+      - node_modules/
+
+  script:
+    - npm install # npm install
+    - npm run build # npm run docs:build
+  artifacts:
+    paths:
+      - src/.vuepress/dist
+  only:
+    - master
 
 deploy:
   stage: deploy
-  environment:
-    name: prod
-    url: https://papyrus.noobymatze.io
+  dependencies:
+    - build
   script:
     - npm run build
     - cp -R dist/* /var/www/papyrus.noobymatze.io/
