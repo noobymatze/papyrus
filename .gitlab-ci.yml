@@ -1,0 +1,12 @@
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  environment:
+    name: prod
+    url: https://papyrus.noobymatze.io
+  script:
+    - npm run build
+    - cp -R dist/* /var/www/papyrus.noobymatze.io/
+

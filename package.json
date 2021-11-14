@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "parcel serve index.html",
+    "build": "parcel build index.html",
     "test": "elm-test"
   },
   "keywords": [
