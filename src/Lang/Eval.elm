@@ -2,8 +2,8 @@ module Lang.Eval exposing (..)
 
 import Dict exposing (Dict)
 import Element exposing (Element(..), attribute, node)
-import Lang.Env as Env exposing (Env)
-import Lang.Syntax as Syntax exposing (Expr(..))
+import Lang.Environment as Env exposing (Environment)
+import Lang.Expr as Expr exposing (Expr(..))
 
 
 type Error
@@ -20,11 +20,11 @@ type Error
 eval : Expr -> Result Error Expr
 eval expr =
     expr
-        |> evalHelp Env.default
+        |> evalHelp Env.empty
         |> Result.map Tuple.first
 
 
-evalHelp : Env -> Expr -> Result Error ( Expr, Env )
+evalHelp : Environment -> Expr -> Result Error ( Expr, Environment )
 evalHelp env expr =
     case expr of
         Int _ ->
@@ -85,7 +85,7 @@ evalHelp env expr =
                 |> Result.map (Tuple.mapFirst List)
 
 
-apply : Env -> Expr -> List Expr -> Result Error ( Expr, Env )
+apply : Environment -> Expr -> List Expr -> Result Error ( Expr, Environment )
 apply env proc args =
     if isBuiltin proc then
         applyBuiltin env proc args
@@ -99,7 +99,7 @@ apply env proc args =
                 applyFn nextEnv procedure args
 
 
-applyFn : Env -> Expr -> List Expr -> Result Error ( Expr, Env )
+applyFn : Environment -> Expr -> List Expr -> Result Error ( Expr, Environment )
 applyFn env expr params =
     case expr of
         Fn { args, body } ->
@@ -153,7 +153,7 @@ builtin =
             )
 
 
-applyBuiltin : Env -> Expr -> List Expr -> Result Error ( Expr, Env )
+applyBuiltin : Environment -> Expr -> List Expr -> Result Error ( Expr, Environment )
 applyBuiltin env expr args =
     case expr of
         Symbol name ->
@@ -179,7 +179,7 @@ isBuiltin expr =
             False
 
 
-evalIf : Env -> Expr -> Expr -> Expr -> Result Error ( Expr, Env )
+evalIf : Environment -> Expr -> Expr -> Expr -> Result Error ( Expr, Environment )
 evalIf env condition then_ else_ =
     case evalHelp env condition of
         Ok ( Boolean True, _ ) ->
@@ -192,10 +192,10 @@ evalIf env condition then_ else_ =
             Err error
 
         Ok ( result, _ ) ->
-            Err (TypeMismatch { required = "Bool", found = Syntax.type_ result })
+            Err (TypeMismatch { required = "Bool", found = Expr.type_ result })
 
 
-evalSymbol : Env -> String -> Result Error ( Expr, Env )
+evalSymbol : Environment -> String -> Result Error ( Expr, Environment )
 evalSymbol env symbol =
     case Env.get symbol env of
         Nothing ->
@@ -205,7 +205,7 @@ evalSymbol env symbol =
             Ok ( foundExpr, env )
 
 
-evalSequence : Env -> List Expr -> Result Error ( List Expr, Env )
+evalSequence : Environment -> List Expr -> Result Error ( List Expr, Environment )
 evalSequence env =
     let
         evalSequenceHelp ( result, curEnv ) expressions =
@@ -224,7 +224,7 @@ evalSequence env =
     evalSequenceHelp ( [], env )
 
 
-evalDefn : Env -> String -> List Expr -> Expr -> List Expr -> Result Error ( Expr, Env )
+evalDefn : Environment -> String -> List Expr -> Expr -> List Expr -> Result Error ( Expr, Environment )
 evalDefn env name args body rest =
     let
         argNames =
@@ -279,7 +279,7 @@ numOp forInt forFloat expr1 expr2 =
             Err
                 (TypeMismatch
                     { required = "Int or Float"
-                    , found = Syntax.type_ expr1 ++ " and " ++ Syntax.type_ expr2
+                    , found = Expr.type_ expr1 ++ " and " ++ Expr.type_ expr2
                     }
                 )
 

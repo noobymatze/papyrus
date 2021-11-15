@@ -2,7 +2,7 @@ module Lang.SyntaxTests exposing (..)
 
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
-import Lang.Syntax as Syntax exposing (Expr(..))
+import Lang.Expr as Syntax exposing (Expr(..))
 import Test exposing (..)
 
 

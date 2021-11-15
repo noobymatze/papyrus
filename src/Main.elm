@@ -8,7 +8,7 @@ import Html.Events exposing (onInput)
 import Json.Decode
 import Json.Encode as Encode
 import Lang.Eval as Eval exposing (Error(..))
-import Lang.Syntax as Syntax exposing (Expr(..))
+import Lang.Expr as Expr exposing (Expr(..))
 import Ports
 
 
@@ -50,7 +50,7 @@ init flags =
     ( { input = input
       , expr =
             input
-                |> Syntax.parse
+                |> Expr.parse
                 |> Result.toMaybe
       }
     , Cmd.none
@@ -84,7 +84,7 @@ viewResult result =
             text <| "Type mismatch, required '" ++ required ++ "', found '" ++ found ++ "'"
 
         Err (Uncallable expr) ->
-            text <| "The expression " ++ Encode.encode 2 (Syntax.encode expr) ++ " is uncallable or unknown"
+            text <| "The expression " ++ Encode.encode 2 (Expr.encode expr) ++ " is uncallable or unknown"
 
         Err (ArithmeticError message) ->
             text message
@@ -129,7 +129,7 @@ viewExpr expr =
             div [] (List.map viewExpr exprs)
 
         Fn _ ->
-            text <| Encode.encode 2 <| Syntax.encode expr
+            text <| Encode.encode 2 <| Expr.encode expr
 
         Prog exprs ->
             div [] (List.map viewExpr exprs)
@@ -162,6 +162,6 @@ update msg model =
             ( model, Cmd.none )
 
         Update input ->
-            ( { model | input = input, expr = Syntax.parse input |> Result.toMaybe }
+            ( { model | input = input, expr = Expr.parse input |> Result.toMaybe }
             , Ports.save input
             )

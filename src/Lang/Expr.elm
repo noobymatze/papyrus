@@ -1,4 +1,4 @@
-module Lang.Syntax exposing (..)
+module Lang.Expr exposing (..)
 
 import Element exposing (Element)
 import Json.Encode as Encode exposing (Value)
