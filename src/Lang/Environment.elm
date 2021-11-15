@@ -41,7 +41,7 @@ type Environment
 
 
 
--- PUBLIC HELPERS
+-- CREATING ENVIRONMENTS
 
 
 {-| Returns an empty [`Environment`].
@@ -56,6 +56,10 @@ empty =
 extend : Dict String Expr -> Environment -> Environment
 extend bindings parent =
     Env { bindings = bindings, parent = Just parent }
+
+
+
+-- WORKING WITH ENVIRONMENTS
 
 
 {-| Sets the given value in the given environment.
