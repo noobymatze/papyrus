@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser
 import Element exposing (Element)
+import Export.Wicket as Wicket
 import Html exposing (Html, div, h1, node, pre, span, text, textarea)
 import Html.Attributes exposing (class, style, value)
 import Html.Events exposing (onInput)
@@ -68,14 +69,15 @@ view model =
         [ div [ class "row p-3 h-100" ]
             [ div [ class "col-sm h-100" ] [ codeEditor Update model.input ]
             , div [ class "col-sm h-100" ]
-                [ Maybe.withDefault hidden <| Maybe.map viewResult <| Maybe.map Eval.eval model.expr
+                [ Maybe.withDefault hidden <| Maybe.map (viewResult viewExpr) <| Maybe.map Eval.eval model.expr
+                , Maybe.withDefault hidden <| Maybe.map (viewResult viewWicket) <| Maybe.map Eval.eval model.expr
                 ]
             ]
         ]
 
 
-viewResult : Result Error Expr -> Html Msg
-viewResult result =
+viewResult : (Expr -> Html Msg) -> Result Error Expr -> Html Msg
+viewResult f result =
     case result of
         Err (UnknownSymbol name) ->
             text <| "Unknown Symbol '" ++ name ++ "'"
@@ -90,12 +92,25 @@ viewResult result =
             text message
 
         Ok expr ->
-            viewExpr expr
+            f expr
 
 
 hidden : Html msg
 hidden =
     span [ style "display" "none" ] []
+
+
+viewWicket : Expr -> Html Msg
+viewWicket expr =
+    case expr of
+        Html node ->
+            pre [] [ text (Wicket.compile node) ]
+
+        List exprs ->
+            div [] (List.map viewWicket exprs)
+
+        _ ->
+            hidden
 
 
 viewExpr : Expr -> Html Msg
