@@ -1,7 +1,7 @@
 module Lang.Eval exposing (..)
 
 import Dict exposing (Dict)
-import Element exposing (Element(..), attribute, node)
+import Element exposing (Attribute, Element(..), attribute, node)
 import Lang.Environment as Env exposing (Environment)
 import Lang.Expr as Expr exposing (Expr(..))
 
@@ -115,7 +115,11 @@ applyFn env expr params =
             Err (Uncallable expr)
 
 
-builtin : Dict String (List Expr -> Result Error Expr)
+type alias Builtin =
+    List Expr -> Result Error Expr
+
+
+builtin : Dict String Builtin
 builtin =
     Dict.empty
         |> Dict.insert "+" (op add (Ok (Int 0)))
@@ -131,26 +135,29 @@ builtin =
                         |> Str
                     )
             )
-        |> Dict.insert "row"
-            (\args ->
-                Ok (Html (node "div" [ attribute "class" "row" ] (List.filterMap toElement args)))
-            )
-        |> Dict.insert "col"
-            (\args ->
-                Ok (Html (node "div" [ attribute "class" "col-sm" ] (List.filterMap toElement args)))
-            )
-        |> Dict.insert "input"
-            (\_ ->
-                Ok (Html (node "input" [ attribute "class" "form-control", attribute "type" "text" ] []))
-            )
-        |> Dict.insert "label"
-            (\args ->
-                Ok (Html (node "label" [] (List.filterMap toElement args)))
-            )
+        |> Dict.insert "row" (nodeHelp "div" [ attribute "class" "row mt-3" ])
+        |> Dict.insert "col" (nodeHelp "div" [ attribute "class" "col-sm" ])
+        |> insertNode "input" [ attribute "class" "form-control" ]
+        |> insertNode "label" []
+        |> insertNode "h1" []
+        |> insertNode "h2" []
+        |> insertNode "h3" []
+        |> insertNode "h4" []
+        |> insertNode "div" []
         |> Dict.insert "text"
             (\args ->
                 Ok (Html (Element.str (String.join "" <| List.map toString args)))
             )
+
+
+nodeHelp : String -> List Attribute -> List Expr -> Result e Expr
+nodeHelp name attributes args =
+    Ok <| Html <| node name attributes (List.filterMap toElement args)
+
+
+insertNode : String -> List Attribute -> Dict String Builtin -> Dict String Builtin
+insertNode name attributes =
+    Dict.insert name (\args -> Ok <| Html <| node name attributes (List.filterMap toElement args))
 
 
 applyBuiltin : Environment -> Expr -> List Expr -> Result Error ( Expr, Environment )
