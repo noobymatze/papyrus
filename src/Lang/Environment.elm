@@ -76,7 +76,7 @@ get name (Env env) =
     case Dict.get name env.bindings of
         Nothing ->
             env.parent
-                |> Maybe.andThen (\(Env parentEnv) -> Dict.get name parentEnv.bindings)
+                |> Maybe.andThen (get name)
 
         Just expr ->
             Just expr
