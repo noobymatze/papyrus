@@ -1,5 +1,6 @@
 module Lang.Expr exposing (..)
 
+import Dict exposing (Dict)
 import Element exposing (Element)
 import Json.Encode as Encode exposing (Value)
 import Parser exposing ((|.), (|=), DeadEnd, Parser)
@@ -17,10 +18,63 @@ type Expr
     | Str String
     | Boolean Bool
     | Nil
+    | Map (Dict String Expr)
+    | Keyword String
     | Html Element
     | List (List Expr)
     | Fn { args : List String, body : Expr }
     | Prog (List Expr)
+
+
+
+-- PUBLIC HELPERS
+
+
+toString : Expr -> String
+toString expr =
+    case expr of
+        Int int ->
+            String.fromInt int
+
+        Float float ->
+            String.fromFloat float
+
+        Symbol string ->
+            string
+
+        Str string ->
+            "\"" ++ string ++ "\""
+
+        Map dict ->
+            dict
+                |> Dict.toList
+                |> List.map (\( a, b ) -> a ++ " " ++ toString b)
+                |> String.join " "
+                |> enclose "{" "}"
+
+        Keyword string ->
+            string
+
+        Boolean True ->
+            "true"
+
+        Boolean False ->
+            "false"
+
+        Html html ->
+            "Html"
+
+        Nil ->
+            ""
+
+        List expressions ->
+            "(" ++ String.join " " (List.map toString expressions) ++ ")"
+
+        Fn _ ->
+            "Fn"
+
+        Prog expressions ->
+            String.join " " (List.map toString expressions)
 
 
 
@@ -39,6 +93,9 @@ encode expr =
         Str string ->
             Encode.string string
 
+        Map dict ->
+            Encode.dict identity encode dict
+
         Boolean bool ->
             Encode.bool bool
 
@@ -46,6 +103,9 @@ encode expr =
             Encode.null
 
         Symbol string ->
+            Encode.string string
+
+        Keyword string ->
             Encode.string string
 
         List exprs ->
@@ -75,6 +135,12 @@ type_ expr =
 
         Symbol _ ->
             "Symbol"
+
+        Keyword _ ->
+            "Keyword"
+
+        Map _ ->
+            "Map"
 
         Str _ ->
             "String"
@@ -125,6 +191,8 @@ form =
     Parser.oneOf
         [ str
         , boolean
+        , map
+        , keyword
         , symbol
         , number
         , Parser.map List list
@@ -172,6 +240,53 @@ symbol =
             }
 
 
+map : Parser Expr
+map =
+    let
+        toComparable ( key, value ) =
+            case key of
+                Str string ->
+                    Just ( string, value )
+
+                Keyword string ->
+                    Just ( string, value )
+
+                Symbol string ->
+                    Just ( string, value )
+
+                _ ->
+                    Nothing
+    in
+    Parser.map Map <|
+        Parser.map Dict.fromList <|
+            Parser.map (List.filterMap toComparable) <|
+                Parser.sequence
+                    { spaces = whitespace
+                    , end = "}"
+                    , start = "{"
+                    , item =
+                        Parser.lazy
+                            (\_ ->
+                                Parser.succeed Tuple.pair
+                                    |= form
+                                    |. whitespace
+                                    |= form
+                            )
+                    , separator = ""
+                    , trailing = Parser.Forbidden
+                    }
+
+
+keyword : Parser Expr
+keyword =
+    Parser.map Keyword <|
+        Parser.variable
+            { start = \c -> c == ':'
+            , inner = isSymbolChar Char.isAlphaNum
+            , reserved = Set.empty
+            }
+
+
 isSymbolChar : (Char -> Bool) -> Char -> Bool
 isSymbolChar other c =
     let
@@ -204,3 +319,8 @@ strHelp =
     Parser.getChompedString <|
         Parser.succeed ()
             |. Parser.chompWhile (\c -> c /= '"')
+
+
+enclose : String -> String -> String -> String
+enclose a b x =
+    a ++ x ++ b

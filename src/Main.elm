@@ -119,6 +119,12 @@ viewExpr expr =
         Int int ->
             text (String.fromInt int)
 
+        Map _ ->
+            text (Expr.toString expr)
+
+        Keyword keyword ->
+            text keyword
+
         Float float ->
             text (String.fromFloat float)
 

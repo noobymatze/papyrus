@@ -42,6 +42,13 @@ evalHelp env expr =
         Str _ ->
             Ok ( expr, env )
 
+        Keyword _ ->
+            Ok ( expr, env )
+
+        Map dict ->
+            evalMap env dict
+                |> Result.map (\new -> ( Map new, env ))
+
         Html _ ->
             Ok ( expr, env )
 
@@ -130,7 +137,7 @@ builtin =
             (\args ->
                 Ok
                     (args
-                        |> List.map toString
+                        |> List.map Expr.toString
                         |> String.join ""
                         |> Str
                     )
@@ -146,7 +153,7 @@ builtin =
         |> insertNode "div" []
         |> Dict.insert "text"
             (\args ->
-                Ok (Html (Element.str (String.join "" <| List.map toString args)))
+                Ok (Html (Element.str (String.join "" <| List.map Expr.toString args)))
             )
 
 
@@ -243,6 +250,25 @@ evalDefn env name args body rest =
         )
 
 
+evalMap : Environment -> Dict String Expr -> Result Error (Dict String Expr)
+evalMap env =
+    let
+        combine k expr result =
+            case result of
+                Err error ->
+                    Err error
+
+                Ok newDict ->
+                    case evalHelp env expr of
+                        Err error ->
+                            Err error
+
+                        Ok ( evaled, _ ) ->
+                            Ok (Dict.insert k evaled newDict)
+    in
+    Dict.foldl combine (Ok Dict.empty)
+
+
 op : (Expr -> Expr -> Result Error Expr) -> Result Error Expr -> List Expr -> Result Error Expr
 op combine zero =
     let
@@ -308,43 +334,6 @@ toElement expr =
 
         _ ->
             Nothing
-
-
-toString : Expr -> String
-toString expr =
-    case expr of
-        Int int ->
-            String.fromInt int
-
-        Float float ->
-            String.fromFloat float
-
-        Symbol string ->
-            string
-
-        Str string ->
-            string
-
-        Boolean True ->
-            "true"
-
-        Boolean False ->
-            "false"
-
-        Html html ->
-            "Html"
-
-        Nil ->
-            ""
-
-        List expressions ->
-            "(" ++ String.join " " (List.map toString expressions) ++ ")"
-
-        Fn _ ->
-            "Fn"
-
-        Prog expressions ->
-            String.join " " (List.map toString expressions)
 
 
 
